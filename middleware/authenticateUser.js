@@ -13,7 +13,7 @@ const authenticateUser = (req, res, next) => {
 
   // Extract the authToken from the header
   const authToken = authTokenHeader.substring(7); // Remove "Bearer " prefix
-
+  console.log(authToken)
   try {
     // Verify the authToken and decode it to get the user data (e.g., user ID, email, etc.)
     const decodedToken = jwt.verify(authToken, JWT_SECRET);
