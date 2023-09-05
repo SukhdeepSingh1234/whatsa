@@ -1,9 +1,10 @@
-import express from 'express'
-import randomstring from 'randomstring'
-import nodemailer from 'nodemailer'
+const express = require('express');
+
+const randomstring= require( 'randomstring')
+const nodemailer= require( 'nodemailer')
 const router = express.Router();
 router.use(express.json());
-import dotenv from 'dotenv'
+const dotenv= require( 'dotenv')
 dotenv.config()
 
 const sendOTP = (email) => {
@@ -36,4 +37,4 @@ const sendOTP = (email) => {
 
 }
 
-export default sendOTP;
+module.exports= sendOTP;
