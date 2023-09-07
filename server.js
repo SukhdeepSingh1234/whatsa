@@ -159,6 +159,7 @@ app.post("/getUserData", authenticateUser, async (req, res) => {
     res.status(200).json({
       username: user.name,
       imageUrl: user.image,
+      bio:user.bio
     });
   } catch (error) {
     console.error(error);
