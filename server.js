@@ -1,6 +1,6 @@
 //importing
 const express = require("express");
-
+const grid = require("gridfs-stream");
 const { body, validationResult } = require("express-validator");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
@@ -10,11 +10,12 @@ const User = require("./models/dbVerify");
 const generateOTP = require("./generateOtp");
 const dotenv = require("dotenv");
 const authenticateUser = require("./middleware/authenticateUser");
-
+const Conversation = require("./models/Conversation");
+const Message = require("./models/dbMessages");
 // Routes
 const userRoute = require("./routes/userRoutes");
 const sendOtpRoute = require("./routes/sendOtp");
-
+const upload = require("./middleware/upload");
 dotenv.config();
 
 const app = express();
@@ -33,7 +34,6 @@ const port = process.env.PORT || 3000;
 // middlewares
 
 app.use(express.json());
-app.use(cors());
 
 // app.use((req,res,next)=>{
 //     res.setHeader("Access-Control-Allow-Origin","*")
@@ -46,8 +46,18 @@ app.use(cors());
 mongoose.connect(process.env.DATABASE);
 
 // configuring Pusher to get real time database feature
-const db = mongoose.connection;
+
 console.log("DB Connected");
+
+const conn = mongoose.connection;
+let gfs, gridFsBucket;
+conn.once("open", () => {
+  gridFsBucket = new mongoose.mongo.GridFSBucket(conn.db, {
+    bucketName: "fs",
+  });
+  gfs = grid(conn.db, mongoose.mongo);
+  gfs.collection("fs");
+});
 
 // db.once('open',()=>{
 
@@ -77,8 +87,13 @@ console.log("DB Connected");
 app.use("/api/auth", userRoute);
 app.use("/api/otp", sendOtpRoute);
 
-app.get("*", (req, res) => {
-  res.redirect("/");
+app.get("/users", async (req, res) => {
+  try {
+    const users = await User.find({});
+    res.status(200).json(users);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 // app.get('/messages/sync',(req,res)=>{
@@ -150,6 +165,7 @@ app.post("/getUserData", authenticateUser, async (req, res) => {
     const userId = req.user;
     // Use Mongoose to fetch data from MongoDB
     const user = await User.findById(userId);
+    console.log(user);
     //  console.log(user.id)
 
     if (!user) {
@@ -157,13 +173,89 @@ app.post("/getUserData", authenticateUser, async (req, res) => {
     }
     console.log(user);
     res.status(200).json({
+      id: user.id,
       username: user.name,
       imageUrl: user.image,
-      bio:user.bio
+      bio: user.bio,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server Error" });
+  }
+});
+
+app.post("/convesation/add", async (req, res) => {
+  try {
+    const senderId = req.body.senderId;
+    const receiverId = req.body.receiverId;
+    const exist = await Conversation.findOne({
+      members: { $all: [receiverId, senderId] },
+    }); // $all checks if both the senderId and receiverId are the same inside members
+    if (exist) {
+      return res.status(200).json("conversation already exists");
+    }
+    const newConversation = new Conversation({
+      members: [senderId, receiverId],
+    });
+    await newConversation.save();
+    res.status(200).json("conversation saved successfully");
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.post("/conversation/sync", async (req, res) => {
+  try {
+    const senderId = req.body.senderId;
+    const receiverId = req.body.receiverId;
+    let conversation = await Conversation.findOne({
+      members: { $all: [receiverId, senderId] },
+    });
+    return res.status(200).json(conversation);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.post("/messages/new", async (req, res) => {
+  try {
+    const newMessage = new Message(req.body);
+    await newMessage.save();
+    await Conversation.findByIdAndUpdate(req.body.conversationId, {
+      message: req.body.message,
+    });
+    return res.status(200).json("message saved successfully");
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.get("/messages/sync/:id", async (req, res) => {
+  try {
+    const messages = await Message.find({ conversationId: req.params.id });
+    return res.status(200).json(messages);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+const url = "http://localhost:9000";
+
+app.post("/file/upload", upload.single("file"), async (req, res) => {
+  if (!req.file) {
+    return res.status(404).json("file not found");
+  }
+  const imageUrl = `${url}/file/${req.file.filename}`;
+  return res.status(200).json(imageUrl);
+});
+
+app.get("/file/:filename", async (req, res) => {
+  try {
+    const file = await gfs.files.findOne({ filename: req.params.filename });
+    const readStream = gridFsBucket.openDownloadStream(file._id);
+    readStream.pipe(res);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
 });
 
