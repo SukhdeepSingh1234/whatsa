@@ -84,6 +84,7 @@ conn.once("open", () => {
 
 // api routes
 
+
 app.use("/api/auth", userRoute);
 app.use("/api/otp", sendOtpRoute);
 
@@ -105,6 +106,7 @@ app.get("/users", async (req, res) => {
 //             res.status(500).send(err)
 //         })
 // })
+
 
 // app.post('/messages/new',(req,res)=>{
 //     const dbMessage=new Messages(req.body);
