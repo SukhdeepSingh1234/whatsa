@@ -241,7 +241,7 @@ app.get("/messages/sync/:id", async (req, res) => {
   }
 });
 
-const url = "http://localhost:9000";
+const url = process.env.APP_URL || "http://localhost:9000";
 
 app.post("/file/upload", upload.single("file"), async (req, res) => {
   if (!req.file) {
@@ -250,6 +250,7 @@ app.post("/file/upload", upload.single("file"), async (req, res) => {
   const imageUrl = `${url}/file/${req.file.filename}`;
   return res.status(200).json(imageUrl);
 });
+
 
 app.get("/file/:filename", async (req, res) => {
   try {
